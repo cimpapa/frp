@@ -25,8 +25,11 @@ import (
 )
 
 func main() {
+	// 设置加密模块的盐值为frp
 	crypto.DefaultSalt = "frp"
+	// 设定随机种子
 	rand.Seed(time.Now().UnixNano())
 
+	// 开始执行主流程
 	Execute()
 }

@@ -193,8 +193,10 @@ func (ctl *Control) Start() {
 		ServerUDPPort: ctl.serverCfg.BindUDPPort,
 		Error:         "",
 	}
+	// 返回登录成功消息给客户端
 	msg.WriteMsg(ctl.conn, loginRespMsg)
 
+	// 创建一个加密写入的 go 程
 	go ctl.writer()
 	for i := 0; i < ctl.poolCount; i++ {
 		ctl.sendCh <- &msg.ReqWorkConn{}
@@ -295,6 +297,7 @@ func (ctl *Control) writer() {
 	defer ctl.allShutdown.Start()
 	defer ctl.writerShutdown.Done()
 
+	// 创建加密信道
 	encWriter, err := crypto.NewWriter(ctl.conn, []byte(ctl.serverCfg.Token))
 	if err != nil {
 		xl.Error("crypto new writer error: %v", err)
@@ -412,17 +415,20 @@ func (ctl *Control) manager() {
 
 	for {
 		select {
+		// 心跳检测，好像超时后没有处理逻辑，哦不，它直接 return 了，这个 go 程就关闭了，这个 go 程关闭后会执行上面的 defer 函数
 		case <-heartbeatCh:
 			if time.Since(ctl.lastPing) > time.Duration(ctl.serverCfg.HeartbeatTimeout)*time.Second {
 				xl.Warn("heartbeat timeout")
 				return
 			}
+		// 	收到消息处理逻辑
 		case rawMsg, ok := <-ctl.readCh:
 			if !ok {
 				return
 			}
 
 			switch m := rawMsg.(type) {
+			// 如果是创建新的代理
 			case *msg.NewProxy:
 				content := &plugin.NewProxyContent{
 					User: plugin.UserInfo{
@@ -433,6 +439,7 @@ func (ctl *Control) manager() {
 					NewProxy: *m,
 				}
 				var remoteAddr string
+				// 创建
 				retContent, err := ctl.pluginManager.NewProxy(content)
 				if err == nil {
 					m = &retContent.NewProxy
@@ -452,9 +459,11 @@ func (ctl *Control) manager() {
 					metrics.Server.NewProxy(m.ProxyName, m.ProxyType)
 				}
 				ctl.sendCh <- resp
+			// 	关闭代理消息
 			case *msg.CloseProxy:
 				ctl.CloseProxy(m)
 				xl.Info("close proxy [%s] success", m.ProxyName)
+			// 	ping 消息
 			case *msg.Ping:
 				content := &plugin.PingContent{
 					User: plugin.UserInfo{

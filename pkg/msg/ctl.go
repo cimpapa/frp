@@ -33,6 +33,7 @@ func init() {
 	}
 }
 
+// ReadMsg 读取 json 文件格式的消息， 返回的是 Message
 func ReadMsg(c io.Reader) (msg Message, err error) {
 	return msgCtl.ReadMsg(c)
 }

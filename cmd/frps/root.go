@@ -64,6 +64,7 @@ var (
 	tlsOnly           bool
 )
 
+// 定义命令行参数
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file of frps")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "version of frps")
@@ -94,8 +95,11 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "frps",
+	// 命令的名称
+	Use: "frps",
+	// 命令的简短描述
 	Short: "frps is the server of frp (https://github.com/fatedier/frp)",
+	// 命令处理逻辑，可以返回错误，与 Run 不同
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if showVersion {
 			fmt.Println(version.Full())
@@ -128,6 +132,7 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
+	// 执行 Execute 会调用 RunE 方法
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -193,6 +198,7 @@ func parseServerCommonCfgFromCmd() (cfg config.ServerCommonConf, err error) {
 	return
 }
 
+// 关键运行启动函数
 func runServer(cfg config.ServerCommonConf) (err error) {
 	log.InitLog(cfg.LogWay, cfg.LogFile, cfg.LogLevel, cfg.LogMaxDays, cfg.DisableLogColor)
 
@@ -202,11 +208,13 @@ func runServer(cfg config.ServerCommonConf) (err error) {
 		log.Info("frps uses command line arguments for config")
 	}
 
+	// 创建 server 服务
 	svr, err := server.NewService(cfg)
 	if err != nil {
 		return err
 	}
 	log.Info("frps started successfully")
+	// 运行 server 服务
 	svr.Run()
 	return
 }

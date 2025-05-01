@@ -97,6 +97,7 @@ type Service struct {
 	cfg config.ServerCommonConf
 }
 
+// NewService 创建 server 服务
 func NewService(cfg config.ServerCommonConf) (svr *Service, err error) {
 	tlsConfig, err := transport.NewServerTLSConfig(
 		cfg.TLSCertFile,
@@ -316,6 +317,7 @@ func (svr *Service) Run() {
 }
 
 func (svr *Service) handleConnection(ctx context.Context, conn net.Conn) {
+	// 从ctx中获取xlog
 	xl := xlog.FromContextSafe(ctx)
 
 	var (
@@ -324,6 +326,7 @@ func (svr *Service) handleConnection(ctx context.Context, conn net.Conn) {
 	)
 
 	conn.SetReadDeadline(time.Now().Add(connReadTimeout))
+	// 进行消息内容解析，通过一系列机制将rawMsg变为了对应的结构体对象
 	if rawMsg, err = msg.ReadMsg(conn); err != nil {
 		log.Trace("Failed to read message: %v", err)
 		conn.Close()
@@ -331,16 +334,20 @@ func (svr *Service) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 	conn.SetReadDeadline(time.Time{})
 
+	// 处理消息逻辑
 	switch m := rawMsg.(type) {
+	// 这里使用结构体的指针类型
 	case *msg.Login:
 		// server plugin hook
 		content := &plugin.LoginContent{
 			Login:         *m,
 			ClientAddress: conn.RemoteAddr().String(),
 		}
+		// 登录逻辑
 		retContent, err := svr.pluginManager.Login(content)
 		if err == nil {
 			m = &retContent.Login
+			// 注册逻辑
 			err = svr.RegisterControl(conn, m)
 		}
 
@@ -378,6 +385,7 @@ func (svr *Service) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 }
 
+// HandleListener 监听通用逻辑
 func (svr *Service) HandleListener(l net.Listener) {
 	// Listen for incoming connections from client.
 	for {
@@ -404,6 +412,7 @@ func (svr *Service) HandleListener(l net.Listener) {
 		log.Trace("check TLS connection success, isTLS: %v custom: %v", isTLS, custom)
 
 		// Start a new goroutine to handle connection.
+		// 创建新的goroutine的目的是，非阻塞主循环，独立上下文
 		go func(ctx context.Context, frpConn net.Conn) {
 			if svr.cfg.TCPMux {
 				fmuxCfg := fmux.DefaultConfig()
@@ -426,6 +435,7 @@ func (svr *Service) HandleListener(l net.Listener) {
 					go svr.handleConnection(ctx, stream)
 				}
 			} else {
+				// 常用的处理连接逻辑
 				svr.handleConnection(ctx, frpConn)
 			}
 		}(ctx, c)
@@ -460,16 +470,20 @@ func (svr *Service) RegisterControl(ctlConn net.Conn, loginMsg *msg.Login) (err 
 		return
 	}
 
+	// 创建一个新的 control
 	ctl := NewControl(ctx, svr.rc, svr.pxyManager, svr.pluginManager, svr.authVerifier, ctlConn, loginMsg, svr.cfg)
+	// 如果存在旧的配置，删除关闭旧的配置连接
 	if oldCtl := svr.ctlManager.Add(loginMsg.RunID, ctl); oldCtl != nil {
 		oldCtl.allShutdown.WaitDone()
 	}
 
+	// 该配置开始提供服务
 	ctl.Start()
 
-	// for statistics
+	// 为了数据分析和可视化
 	metrics.Server.NewClient()
 
+	// 优雅关闭
 	go func() {
 		// block until control closed
 		ctl.WaitClosed()

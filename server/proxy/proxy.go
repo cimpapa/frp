@@ -177,6 +177,7 @@ func (pxy *BaseProxy) startListenHandler(p Proxy, handler func(Proxy, net.Conn, 
 					return
 				}
 				xl.Info("get a user connection [%s]", c.RemoteAddr().String())
+				// 循环中的关键 go 程，一个 user 一次
 				go handler(p, c, pxy.serverCfg)
 			}
 		}(listener)
@@ -198,6 +199,7 @@ func NewProxy(ctx context.Context, userInfo plugin.UserInfo, rc *controller.Reso
 		ctx:           xlog.NewContext(ctx, xl),
 		userInfo:      userInfo,
 	}
+	// 根据代理的类型创建不同的代理，因为不同代理处理的逻辑是不同的
 	switch cfg := pxyConf.(type) {
 	case *config.TCPProxyConf:
 		basePxy.usedPortsNum = 1
@@ -293,6 +295,7 @@ func HandleUserTCPConnection(pxy Proxy, userConn net.Conn, serverCfg config.Serv
 	name := pxy.GetName()
 	proxyType := pxy.GetConf().GetBaseInfo().ProxyType
 	metrics.Server.OpenConnection(name, proxyType)
+	// 桥接 client 与 user
 	inCount, outCount := frpIo.Join(local, userConn)
 	metrics.Server.CloseConnection(name, proxyType)
 	metrics.Server.AddTrafficIn(name, proxyType, inCount)

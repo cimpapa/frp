@@ -66,6 +66,7 @@ func (pxy *TCPProxy) Run() (remoteAddr string, err error) {
 
 	pxy.cfg.RemotePort = pxy.realPort
 	remoteAddr = fmt.Sprintf(":%d", pxy.realPort)
+	// 执行代理逻辑，从一个端口转发到另一个端口
 	pxy.startListenHandler(pxy, HandleUserTCPConnection)
 	return
 }
